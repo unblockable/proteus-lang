@@ -1,0 +1,9 @@
+[package]
+name = "proteus-lang"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "The Proteus language for programmable network protocols"
+license-file = "LICENSE"
+
+[dependencies]
