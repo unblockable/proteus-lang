@@ -1,6 +1,7 @@
-//! Protocol specifications and message field definitions.
+mod instance;
+mod model;
 
-pub mod message_field;
-pub mod spec;
-
-pub use spec::{Cipher, HandshakePattern, KeyPattern, ProtocolSpec};
+pub use instance::{
+    FieldReference, LiteralValue, ProtocolBindings, ProtocolInstance, ProtocolInstanceBuilder,
+};
+pub use model::*;

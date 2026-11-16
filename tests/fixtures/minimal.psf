@@ -1,0 +1,12 @@
+@SEGMENT.FORMATS
+DEFINE Data
+  { NAME: length; TYPE: u16 },
+  { NAME: payload; TYPE: [u8; length.size_of] };
+
+@SEGMENT.SEMANTICS
+{ FORMAT: Data; FIELD: length; SEMANTIC: LENGTH };
+{ FORMAT: Data; FIELD: payload; SEMANTIC: PAYLOAD };
+
+@SEGMENT.SEQUENCE
+{ ROLE: CLIENT; PHASE: DATA; FORMAT: Data };
+{ ROLE: SERVER; PHASE: DATA; FORMAT: Data };

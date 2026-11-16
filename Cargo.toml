@@ -7,3 +7,8 @@ description = "The Proteus language for programmable network protocols"
 license-file = "LICENSE"
 
 [dependencies]
+
+[dev-dependencies]
+# Keep grammar tests compatible with Rust 1.85 (newer Pest pulls in newer build code).
+pest = "~2.8.0"
+pest_derive = "~2.8.0"

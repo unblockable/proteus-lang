@@ -1,0 +1,42 @@
+@SEGMENT.FORMATS
+DEFINE Hello
+  { NAME: key; TYPE: [u8; 32] },
+  { NAME: greeting; TYPE: [char; 5] };
+
+DEFINE Data
+  { NAME: length; TYPE: u16 },
+  { NAME: payload; TYPE: [u8; length.size_of] },
+  { NAME: padding_length; TYPE: u16 },
+  { NAME: padding; TYPE: [u8; padding_length.size_of] },
+  { NAME: tag; TYPE: [u8; 16] },
+  { NAME: reserved; TYPE: [u8; 2] };
+
+@SEGMENT.SEMANTICS
+{ FORMAT: Hello; FIELD: key; SEMANTIC: PUBKEY(RAW) };
+{ FORMAT: Hello; FIELD: greeting; SEMANTIC: FIXED_STRING("hello") };
+{ FORMAT: Data; FIELD: length; SEMANTIC: LENGTH };
+{ FORMAT: Data; FIELD: payload; SEMANTIC: PAYLOAD };
+{ FORMAT: Data; FIELD: padding_length; SEMANTIC: PADDING_LENGTH };
+{ FORMAT: Data; FIELD: padding; SEMANTIC: PADDING };
+{ FORMAT: Data; FIELD: tag; SEMANTIC: RANDOM(16) };
+{ FORMAT: Data; FIELD: reserved; SEMANTIC: FIXED_BYTES(0x00aF) };
+
+@SEGMENT.SEQUENCE
+{ ROLE: CLIENT; PHASE: HANDSHAKE; FORMAT: Hello };
+{ ROLE: SERVER; PHASE: HANDSHAKE; FORMAT: Hello };
+{ ROLE: CLIENT; PHASE: DATA; FORMAT: Data };
+{ ROLE: SERVER; PHASE: DATA; FORMAT: Data };
+
+@SEGMENT.CRYPTO
+PASSWORD = "example-password";
+CIPHER = AES256GCM;
+
+ENCRYPT Data FROM Data
+  { PTEXT: length; CTEXT: length; MAC: NULL },
+  { PTEXT: payload; CTEXT: payload; MAC: tag };
+
+ENCRYPT Hello FROM Hello
+  { PTEXT: key; CTEXT: key; MAC: NULL };
+
+@SEGMENT.OPTIONS
+SEPARATE_LENGTH_FIELD = true;
