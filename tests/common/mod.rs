@@ -1,7 +1,7 @@
-use proteus_lang::protocol_spec::*;
+use proteus_lang::protocol_specification::*;
 
-pub fn minimal() -> ProtocolInstance {
-    let specification = ProtocolSpecification {
+pub fn minimal() -> ProtocolSpecification {
+    let template = Template {
         formats: vec![Format {
             name: "Data".into(),
             fields: vec![
@@ -19,13 +19,11 @@ pub fn minimal() -> ProtocolInstance {
         }],
         semantics: vec![
             SemanticBinding {
-                format_id: "Data".into(),
-                field_id: "length".into(),
+                target: FieldReference::new("Data", "length"),
                 semantic: FieldSemantic::Length,
             },
             SemanticBinding {
-                format_id: "Data".into(),
-                field_id: "payload".into(),
+                target: FieldReference::new("Data", "payload"),
                 semantic: FieldSemantic::Payload,
             },
         ],
@@ -44,11 +42,11 @@ pub fn minimal() -> ProtocolInstance {
         crypto: None,
         options: None,
     };
-    ProtocolInstance::builder(specification).build().unwrap()
+    binder::bind(template, Assignments::default()).unwrap()
 }
 
-pub fn complete() -> ProtocolInstance {
-    let specification = ProtocolSpecification {
+pub fn complete() -> ProtocolSpecification {
+    let template = Template {
         formats: vec![
             Format {
                 name: "Hello".into(),
@@ -111,43 +109,35 @@ pub fn complete() -> ProtocolInstance {
         ],
         semantics: vec![
             SemanticBinding {
-                format_id: "Hello".into(),
-                field_id: "key".into(),
+                target: FieldReference::new("Hello", "key"),
                 semantic: FieldSemantic::Pubkey(PubkeyEncoding::Raw),
             },
             SemanticBinding {
-                format_id: "Hello".into(),
-                field_id: "greeting".into(),
+                target: FieldReference::new("Hello", "greeting"),
                 semantic: FieldSemantic::FixedString,
             },
             SemanticBinding {
-                format_id: "Data".into(),
-                field_id: "length".into(),
+                target: FieldReference::new("Data", "length"),
                 semantic: FieldSemantic::Length,
             },
             SemanticBinding {
-                format_id: "Data".into(),
-                field_id: "payload".into(),
+                target: FieldReference::new("Data", "payload"),
                 semantic: FieldSemantic::Payload,
             },
             SemanticBinding {
-                format_id: "Data".into(),
-                field_id: "padding_length".into(),
+                target: FieldReference::new("Data", "padding_length"),
                 semantic: FieldSemantic::PaddingLength,
             },
             SemanticBinding {
-                format_id: "Data".into(),
-                field_id: "padding".into(),
+                target: FieldReference::new("Data", "padding"),
                 semantic: FieldSemantic::Padding,
             },
             SemanticBinding {
-                format_id: "Data".into(),
-                field_id: "tag".into(),
+                target: FieldReference::new("Data", "tag"),
                 semantic: FieldSemantic::Random(16),
             },
             SemanticBinding {
-                format_id: "Data".into(),
-                field_id: "reserved".into(),
+                target: FieldReference::new("Data", "reserved"),
                 semantic: FieldSemantic::FixedBytes,
             },
         ],
@@ -212,36 +202,27 @@ pub fn complete() -> ProtocolInstance {
             separate_length_field: Some(true),
         }),
     };
-    let bindings = ProtocolBindings {
+    let assignments = Assignments {
         fields: [
             (
-                FieldReference {
-                    format_id: "Hello".into(),
-                    field_id: "greeting".into(),
-                },
+                FieldReference::new("Hello", "greeting"),
                 LiteralValue::String("hello".into()),
             ),
             (
-                FieldReference {
-                    format_id: "Data".into(),
-                    field_id: "reserved".into(),
-                },
-                LiteralValue::Bytes(HexLiteral("0x00aF".into())),
+                FieldReference::new("Data", "reserved"),
+                LiteralValue::bytes("0x00aF").unwrap(),
             ),
         ]
         .into_iter()
         .collect(),
         password: Some("example-password".into()),
     };
-    ProtocolInstance::builder(specification)
-        .bindings(bindings)
-        .build()
-        .unwrap()
+    binder::bind(template, assignments).unwrap()
 }
 
-/// One declared string slot and its bindings, ready for builder and escaping tests.
-pub fn literal() -> (ProtocolSpecification, ProtocolBindings) {
-    let specification = ProtocolSpecification {
+/// A template with one fixed string and its matching assignment.
+pub fn literal() -> (Template, Assignments) {
+    let template = Template {
         formats: vec![Format {
             name: "Message".into(),
             fields: vec![Field {
@@ -253,8 +234,7 @@ pub fn literal() -> (ProtocolSpecification, ProtocolBindings) {
             }],
         }],
         semantics: vec![SemanticBinding {
-            format_id: "Message".into(),
-            field_id: "value".into(),
+            target: FieldReference::new("Message", "value"),
             semantic: FieldSemantic::FixedString,
         }],
         sequence: vec![SequenceSpecifier {
@@ -265,17 +245,14 @@ pub fn literal() -> (ProtocolSpecification, ProtocolBindings) {
         crypto: None,
         options: None,
     };
-    let bindings = ProtocolBindings {
+    let assignments = Assignments {
         fields: [(
-            FieldReference {
-                format_id: "Message".into(),
-                field_id: "value".into(),
-            },
+            FieldReference::new("Message", "value"),
             LiteralValue::String("hello".into()),
         )]
         .into_iter()
         .collect(),
         password: None,
     };
-    (specification, bindings)
+    (template, assignments)
 }

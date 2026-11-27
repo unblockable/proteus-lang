@@ -1,6 +1,6 @@
 use std::fmt::{self, Write};
 
-use proteus_lang::protocol_spec::*;
+use proteus_lang::protocol_specification::*;
 
 mod common;
 
@@ -44,7 +44,7 @@ fn numeric_types_and_fixed_arrays_use_psf_spelling() {
 }
 
 #[test]
-fn runtime_semantics_render_without_literal_bindings() {
+fn runtime_semantics_render_without_literal_assignments() {
     for (semantic, expected) in [
         (FieldSemantic::Random(12), "RANDOM(12)"),
         (FieldSemantic::Pubkey(PubkeyEncoding::Raw), "PUBKEY(RAW)"),
@@ -55,9 +55,9 @@ fn runtime_semantics_render_without_literal_bindings() {
         (FieldSemantic::Length, "LENGTH"),
         (FieldSemantic::PaddingLength, "PADDING_LENGTH"),
     ] {
-        let (mut specification, _) = common::literal();
-        specification.semantics[0].semantic = semantic;
-        let instance = ProtocolInstance::builder(specification).build().unwrap();
+        let (mut template, _) = common::literal();
+        template.semantics[0].semantic = semantic;
+        let instance = binder::bind(template, Assignments::default()).unwrap();
         assert!(
             instance
                 .to_string()
@@ -77,20 +77,17 @@ fn cipher_names_and_password_presence_render_as_declared() {
     }
     let base = common::minimal();
     for password in [None, Some(""), Some("secret")] {
-        let mut specification = base.specification().clone();
-        specification.crypto = Some(CryptoSegment {
+        let mut template = base.template().clone();
+        template.crypto = Some(CryptoSegment {
             has_password: password.is_some(),
             cipher: Cipher::Aes128Gcm,
             encryption: vec![],
         });
-        let bindings = ProtocolBindings {
+        let assignments = Assignments {
             password: password.map(str::to_owned),
-            ..ProtocolBindings::default()
+            ..Assignments::default()
         };
-        let instance = ProtocolInstance::builder(specification)
-            .bindings(bindings)
-            .build()
-            .unwrap();
+        let instance = binder::bind(template, assignments).unwrap();
         let expected = match password {
             None => "@SEGMENT.CRYPTO\nCIPHER = AES128GCM;\n",
             Some("") => "@SEGMENT.CRYPTO\nPASSWORD = \"\";\nCIPHER = AES128GCM;\n",
@@ -135,18 +132,15 @@ fn field_literals_and_passwords_share_correct_escaping() {
         ),
         ("café / 🦀", "\"café / 🦀\""),
     ] {
-        let (mut specification, mut bindings) = common::literal();
-        specification.crypto = Some(CryptoSegment {
+        let (mut template, mut assignments) = common::literal();
+        template.crypto = Some(CryptoSegment {
             has_password: true,
             cipher: Cipher::Aes128Gcm,
             encryption: vec![],
         });
-        *bindings.fields.values_mut().next().unwrap() = LiteralValue::String(value.into());
-        bindings.password = Some(value.into());
-        let instance = ProtocolInstance::builder(specification)
-            .bindings(bindings)
-            .build()
-            .unwrap();
+        *assignments.fields.values_mut().next().unwrap() = LiteralValue::String(value.into());
+        assignments.password = Some(value.into());
+        let instance = binder::bind(template, assignments).unwrap();
         let text = instance.to_string();
         assert!(text.contains(&format!("FIXED_STRING({quoted})")));
         assert!(text.contains(&format!("PASSWORD = {quoted};")));

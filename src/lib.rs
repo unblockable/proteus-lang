@@ -1,2 +1,1 @@
-pub mod protocol_spec;
-pub mod psf;
+pub mod protocol_specification;

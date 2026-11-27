@@ -1,14 +1,8 @@
 use std::fmt::{self, Write};
 
-use crate::protocol_spec::*;
+use super::*;
 
 impl fmt::Display for Identifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl fmt::Display for HexLiteral {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
@@ -78,14 +72,18 @@ impl fmt::Display for Field {
 impl fmt::Display for Format {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "DEFINE {}", self.name)?;
-        for (index, field) in self.fields.iter().enumerate() {
-            if index > 0 {
-                f.write_str(",\n")?;
-            }
-            write!(f, "  {field}")?;
-        }
-        f.write_str(";")
+        write_fields(f, &self.fields)
     }
+}
+
+fn write_fields(f: &mut fmt::Formatter<'_>, fields: &[impl fmt::Display]) -> fmt::Result {
+    for (index, field) in fields.iter().enumerate() {
+        if index > 0 {
+            f.write_str(",\n")?;
+        }
+        write!(f, "  {field}")?;
+    }
+    f.write_str(";")
 }
 
 /// Formats a string literal without allocating an intermediate escaped string.
@@ -124,20 +122,14 @@ impl fmt::Display for PubkeyEncoding {
 fn write_semantic(
     f: &mut fmt::Formatter<'_>,
     binding: &SemanticBinding,
-    instance: &ProtocolInstance,
+    assignments: &Assignments,
 ) -> fmt::Result {
     match &binding.semantic {
-        FieldSemantic::FixedString => {
-            let LiteralValue::String(value) = instance.literal(binding) else {
-                unreachable!("the instance builder checked the literal kind");
-            };
-            write!(f, "FIXED_STRING({})", Quoted(value))
-        }
-        FieldSemantic::FixedBytes => {
-            let LiteralValue::Bytes(value) = instance.literal(binding) else {
-                unreachable!("the instance builder checked the literal kind");
-            };
-            write!(f, "FIXED_BYTES({value})")
+        FieldSemantic::FixedString | FieldSemantic::FixedBytes => {
+            match &assignments.fields[&binding.target] {
+                LiteralValue::String(value) => write!(f, "FIXED_STRING({})", Quoted(value)),
+                LiteralValue::Bytes(value) => write!(f, "FIXED_BYTES({})", value.as_str()),
+            }
         }
         FieldSemantic::Random(value) => write!(f, "RANDOM({value})"),
         FieldSemantic::Pubkey(value) => write!(f, "PUBKEY({value})"),
@@ -210,13 +202,7 @@ impl fmt::Display for EncryptionFieldDirective {
 impl fmt::Display for EncryptionDirectives {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{}", self.binding)?;
-        for (index, field) in self.fields.iter().enumerate() {
-            if index > 0 {
-                f.write_str(",\n")?;
-            }
-            write!(f, "  {field}")?;
-        }
-        f.write_str(";")
+        write_fields(f, &self.fields)
     }
 }
 
@@ -246,33 +232,32 @@ impl fmt::Display for OptionsSegment {
     }
 }
 
-impl fmt::Display for ProtocolInstance {
+impl fmt::Display for ProtocolSpecification {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let specification = self.specification();
         f.write_str("@SEGMENT.FORMATS")?;
-        for (index, format) in specification.formats.iter().enumerate() {
+        for (index, format) in self.template.formats.iter().enumerate() {
             f.write_str(if index == 0 { "\n" } else { "\n\n" })?;
             write!(f, "{format}")?;
         }
         f.write_str("\n\n@SEGMENT.SEMANTICS")?;
-        for binding in &specification.semantics {
+        for binding in &self.template.semantics {
             write!(
                 f,
                 "\n{{ FORMAT: {}; FIELD: {}; SEMANTIC: ",
-                binding.format_id, binding.field_id
+                binding.target.format_id, binding.target.field_id
             )?;
-            write_semantic(f, binding, self)?;
+            write_semantic(f, binding, &self.assignments)?;
             f.write_str(" };")?;
         }
         f.write_str("\n\n@SEGMENT.SEQUENCE")?;
-        for entry in &specification.sequence {
+        for entry in &self.template.sequence {
             write!(f, "\n{entry}")?;
         }
-        if let Some(crypto) = &specification.crypto {
+        if let Some(crypto) = &self.template.crypto {
             f.write_str("\n\n")?;
-            write_crypto(f, crypto, self.bindings().password.as_deref())?;
+            write_crypto(f, crypto, self.assignments.password.as_deref())?;
         }
-        if let Some(options) = &specification.options {
+        if let Some(options) = &self.template.options {
             write!(f, "\n\n{options}")?;
         }
         f.write_str("\n")

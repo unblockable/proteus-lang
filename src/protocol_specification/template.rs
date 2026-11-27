@@ -1,4 +1,13 @@
-/// A PSF identifier, stored without quoting or validation.
+/// Defines overall protocol structure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Template {
+    pub formats: Vec<Format>,
+    pub semantics: Vec<SemanticBinding>,
+    pub sequence: Vec<SequenceSpecifier>,
+    pub crypto: Option<CryptoSegment>,
+    pub options: Option<OptionsSegment>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier(pub String);
 
@@ -8,9 +17,28 @@ impl From<&str> for Identifier {
     }
 }
 
-/// A PSF hexadecimal literal including its `0x` prefix.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HexLiteral(pub String);
+impl From<String> for Identifier {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+/// Used to identify a field in a protocol. This struct is just used to
+/// unambiguously assign values to fields through [`Assignments`](super::Assignments).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FieldReference {
+    pub format_id: Identifier,
+    pub field_id: Identifier,
+}
+
+impl FieldReference {
+    pub fn new(format_id: impl Into<Identifier>, field_id: impl Into<Identifier>) -> Self {
+        Self {
+            format_id: format_id.into(),
+            field_id: field_id.into(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NumericType {
@@ -77,9 +105,9 @@ pub enum PubkeyEncoding {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FieldSemantic {
-    /// Declares a string literal supplied by the instance's field bindings.
+    /// A string literal supplied when binding the template.
     FixedString,
-    /// Declares a byte literal supplied by the instance's field bindings.
+    /// A byte literal supplied when binding the template.
     FixedBytes,
     Random(usize),
     Pubkey(PubkeyEncoding),
@@ -89,10 +117,10 @@ pub enum FieldSemantic {
     PaddingLength,
 }
 
+/// Assigns a PSF semantic to a field in the template.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SemanticBinding {
-    pub format_id: Identifier,
-    pub field_id: Identifier,
+    pub target: FieldReference,
     pub semantic: FieldSemantic,
 }
 
@@ -134,9 +162,16 @@ pub struct EncryptionDirectives {
     pub fields: Vec<EncryptionFieldDirective>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cipher {
+    ChaCha20Poly1305,
+    Aes128Gcm,
+    Aes256Gcm,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CryptoSegment {
-    /// Whether an instance must supply a password binding.
+    /// Whether binding this template requires a password.
     pub has_password: bool,
     pub cipher: Cipher,
     pub encryption: Vec<EncryptionDirectives>,
@@ -144,23 +179,6 @@ pub struct CryptoSegment {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OptionsSegment {
-    /// `None` omits the assignment; `Some(false)` emits an explicit false value.
+    /// `None` omits the assignment. `Some(false)` emits an explicit false value.
     pub separate_length_field: Option<bool>,
-}
-
-/// The structure of a protocol, with literal values supplied by an instance.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProtocolSpecification {
-    pub formats: Vec<Format>,
-    pub semantics: Vec<SemanticBinding>,
-    pub sequence: Vec<SequenceSpecifier>,
-    pub crypto: Option<CryptoSegment>,
-    pub options: Option<OptionsSegment>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Cipher {
-    ChaCha20Poly1305,
-    Aes128Gcm,
-    Aes256Gcm,
 }
